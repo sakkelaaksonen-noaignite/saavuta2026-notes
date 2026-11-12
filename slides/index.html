@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saavuta 2026 – poimintoja</title>
+<style>
+  /* ---------- Design tokens: tweak these to restyle ---------- */
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --ink: #1b1b1f;
+    --muted: #5a5a66;
+    --accent: #0a5cd6;
+    --accent-ink: #ffffff;
+    --rule: #d9d7cf;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display: var(--font);
+    --stage-w: 1280px;
+    --stage-h: 720px;
+    --pad: 72px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #111; }
+  body { font-family: var(--font); color: var(--ink); overflow: hidden; }
+
+  /* 16:9 stage, scaled to fit the window by JS */
+  .deck {
+    position: absolute; top: 50%; left: 50%;
+    width: var(--stage-w); height: var(--stage-h);
+    transform-origin: center center;
+    background: var(--bg);
+  }
+  .slide {
+    position: absolute; inset: 0;
+    padding: var(--pad);
+    display: flex; flex-direction: column; justify-content: center;
+    opacity: 0; visibility: hidden;
+    transition: opacity .3s ease;
+  }
+  .slide.is-active { opacity: 1; visibility: visible; }
+  @media (prefers-reduced-motion: reduce) { .slide { transition: none; } }
+
+  /* ---------- Typography ---------- */
+  .kicker {
+    font-size: 18px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 16px;
+  }
+  h1, h2 { font-family: var(--font-display); margin: 0 0 32px; line-height: 1.1; }
+  h1 { font-size: 80px; }
+  h2 { font-size: 52px; }
+  p, li { font-size: 28px; line-height: 1.4; }
+  p { margin: 0 0 20px; max-width: 30em; }
+  ul, ol { margin: 0; padding-left: 1.2em; }
+  li { margin-bottom: 12px; }
+  li::marker { color: var(--accent); }
+  strong { font-weight: 700; }
+  .muted { color: var(--muted); }
+  .small { font-size: 20px; }
+
+  /* ---------- Layout variants ---------- */
+  .slide--title { background: var(--accent); color: var(--accent-ink); }
+  .slide--title .kicker { color: inherit; opacity: .8; }
+  .slide--title p { font-size: 32px; opacity: .9; }
+
+  .slide--section { background: var(--ink); color: var(--bg); }
+  .slide--section .kicker { color: var(--bg); opacity: .6; }
+  .slide--section h1 { font-size: 72px; }
+
+  .slide--quote blockquote {
+    margin: 0; font-family: var(--font-display);
+    font-size: 44px; line-height: 1.3; font-weight: 600;
+    border-left: 8px solid var(--accent); padding-left: 40px;
+  }
+  .slide--quote cite { display: block; margin-top: 28px; font-size: 22px; font-style: normal; color: var(--muted); }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+  .cols h3 { font-size: 24px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 16px; }
+
+  .stats { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 32px; }
+  .stat { border-top: 6px solid var(--accent); padding-top: 20px; }
+  .stat b { display: block; white-space: nowrap; font-family: var(--font-display); font-size: var(--stat-size, 88px); line-height: 1; color: var(--accent); margin-bottom: 12px; }
+  .stat span { font-size: 24px; line-height: 1.35; display: block; }
+
+  .steps { list-style: none; padding: 0; counter-reset: s; display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 32px; }
+  .steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--rule); padding: 28px; border-radius: 12px; font-size: 24px; margin: 0; }
+  .steps li::before { content: counter(s); display: block; font-size: 48px; font-weight: 700; color: var(--accent); margin-bottom: 12px; }
+  .steps li strong { display: block; font-size: 28px; margin-bottom: 8px; }
+
+  .qa dt { font-size: 28px; font-weight: 700; margin-top: 12px; }
+  .qa dd { font-size: 26px; line-height: 1.4; margin: 8px 0 24px; color: var(--muted); }
+
+  .figure img { width: 100%; height: auto; border-radius: 8px; display: block; }
+
+  /* Section opener: session title + speakers */
+  .session { margin-top: 8px; border-top: 1px solid rgba(255,255,255,.2); padding-top: 28px; }
+  .session .session-title { max-width: 980px; font-size: 26px; font-style: italic; opacity: .75; margin: 0 0 18px; }
+  .speakers { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px 36px; }
+  .speakers li { font-size: 24px; margin: 0; }
+  .speakers li strong { display: block; font-size: 26px; }
+  .speakers li span { opacity: .65; font-size: 20px; }
+
+  /* Programme slide */
+  .slide--program { padding: 48px var(--pad) 40px; justify-content: flex-start; }
+  .slide--program h2 { font-size: 40px; margin-bottom: 6px; }
+  .slide--program .meta { font-size: 18px; color: var(--muted); margin-bottom: 22px; max-width: none; }
+  .program { display: grid; grid-template-columns: 1fr 1fr; gap: 0 48px; }
+  .program h3 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; padding-bottom: 6px; border-bottom: 2px solid var(--rule); }
+  .program h3 + ol { margin-bottom: 16px; }
+  .program ol { list-style: none; padding: 0; margin: 0; }
+  .program li { display: grid; grid-template-columns: 52px 1fr; gap: 12px; font-size: 16px; line-height: 1.3; margin: 0; padding: 6px 0 6px 10px; border-left: 4px solid transparent; }
+  .program li time { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .program li b { font-weight: 600; }
+  .program li small { display: block; color: var(--muted); font-size: 14px; }
+  .program li.is-covered { border-left-color: var(--accent); background: var(--surface); }
+  .program .legend { font-size: 14px; color: var(--muted); margin: 4px 0 0; }
+  .program .legend::before { content: ""; display: inline-block; width: 4px; height: 14px; background: var(--accent); margin-right: 8px; vertical-align: -2px; }
+
+  /* ---------- Chrome ---------- */
+  .progress { position: absolute; left: 0; bottom: 0; height: 6px; background: var(--accent); transition: width .3s ease; z-index: 2; }
+  .counter { position: absolute; right: 28px; bottom: 20px; font-size: 16px; color: var(--muted); z-index: 2; font-variant-numeric: tabular-nums; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media print {
+    html, body { background: none; overflow: visible; height: auto; }
+    .deck { position: static; transform: none !important; height: auto; }
+    .slide { position: relative; opacity: 1; visibility: visible; width: var(--stage-w); height: var(--stage-h); page-break-after: always; }
+    .progress, .counter { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="deck" id="deck" aria-roledescription="diaesitys">
+
+  <!-- ===== Kansi ===== -->
+  <section class="slide slide--title" aria-label="Kansi">
+    <p class="kicker">Saavuta 2026</p>
+    <h1>Poimintoja ja nostoja</h1>
+    <p>Valvonta, verkkokaupat, hel.fi, eBay ja paneeli</p>
+  </section>
+
+  <!-- ===== Ohjelma ===== -->
+  <section class="slide slide--program" aria-label="Seminaarin ohjelma">
+    <p class="kicker">Saavuta 2026</p>
+    <h2>Seminaarin ohjelma</h2>
+    <p class="meta">11.11.2026 klo 9–16 · Iiris, Marjaniementie 74, Helsinki · verkossa ja livenä</p>
+    <div class="program">
+      <div>
+        <h3>Aamupäivä 9–11</h3>
+        <ol>
+          <li><time>9.00</time><span><b>Seminaarin avaus</b><small>Ari-Pekka Saarela (Q-Factory) &amp; Miia Kirsi (Celia)</small></span></li>
+          <li><time>9.15</time><span><b>Kun kaikki on tarjolla, mutta silti harva ymmärtää</b><small>Kirjailija Juha Hurme</small></span></li>
+          <li class="is-covered"><time>9.50</time><span><b>Vuosi velvoitetta takana – Mikä tilanne verkkokauppojen saavutettavuudessa</b><small>Sami Jukkara (Q-Factory)</small></span></li>
+          <li class="is-covered"><time>10.25</time><span><b>Proaktiivisesti vai määräyksen voimalla? Saavutettavuusvalvonnan ajankohtaisia kuulumisia</b><small>Sanna Sinisalo &amp; Eetu Komsi (Traficom)</small></span></li>
+        </ol>
+        <h3>Etäyleisö 12–13.45</h3>
+        <ol>
+          <li><time>12.00</time><span><b>Lentävät reportterit Saavutettavuustorilta</b><small>Terhi Manninen &amp; Petra Vaisalo</small></span></li>
+          <li><time>12.35</time><span><b>Häiriökysyntää eivät aiheuta häiriköt vaan liian vaikea kieli</b><small>Leealaura Leskelä (Selkokeskus)</small></span></li>
+          <li><time>13.10</time><span><b>Saavutettavuus osaksi sote-ammattilaisten arkea</b><small>Sari Isotalo &amp; Kaisa Luostarinen (Varsinais-Suomen hyvinvointialue)</small></span></li>
+        </ol>
+      </div>
+      <div>
+        <h3>Liveyleisö 11–14</h3>
+        <ol>
+          <li><time>11.05</time><span><b>Lounas ja Saavutettavuustori</b><small>Verkostoitumista toimijoiden pisteillä sekä työpajoja</small></span></li>
+        </ol>
+        <h3>Iltapäivä 14–16</h3>
+        <ol>
+          <li class="is-covered"><time>14.00</time><span><b>Scaling accessibility at a global e-commerce company – how eBay injects accessibility into their culture and processes</b><small>Mark Lapole, Director, Accessibility (eBay)</small></span></li>
+          <li class="is-covered"><time>14.30</time><span><b>Käyttäjäkokemuksen laadunvarmistus – case Helsingin PalveluYdin</b><small>Timo Övermark (Q-Factory), Kati Seppälä &amp; Henna Niemi (Helsingin kaupunki)</small></span></li>
+          <li class="is-covered"><time>15.00</time><span><b>Paneeli: Kenen vastuulla saavutettavuus on?</b><small>Oral, OP Pohjola, Yle, Kesko/K-Ruoka, Q-Factory</small></span></li>
+          <li><time>16.00</time><span><b>Tapahtuma päättyy</b></span></li>
+        </ol>
+        <p class="legend">Käsitellään tässä esityksessä</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Sisältö</p>
+    <h2>Mitä käydään läpi</h2>
+    <ol>
+      <li>Traficom: saavutettavuusvalvonnan ajankohtaiskatsaus</li>
+      <li>Verkkokauppojen saavutettavuus</li>
+      <li>hel.fi: saavutettavuus osana kehitysprosessia</li>
+      <li>eBay: saavutettavuustiimin kokemuksia</li>
+      <li>Paneeli: Oral, OP, YLE, Kesko</li>
+    </ol>
+  </section>
+
+  <!-- ===== 1. Traficom ===== -->
+  <section class="slide slide--section">
+    <p class="kicker">01</p>
+    <h1>Traficom: saavutettavuus&shy;valvonnan ajankohtais&shy;katsaus</h1>
+    <div class="session">
+      <p class="session-title">Proaktiivisesti vai määräyksen voimalla? Saavutettavuusvalvonnan ajankohtaisia kuulumisia</p>
+      <ul class="speakers" aria-label="Puhujat"><li><strong>Sanna Sinisalo</strong><span>Traficom</span></li><li><strong>Eetu Komsi</strong><span>Traficom</span></li></ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Traficom</p>
+    <h2>Proaktiivisesti vai määräyksen voimalla?</h2>
+    <ol class="steps" style="--n:3">
+      <li><strong>Valvontaohjelma</strong>Vuosittain, kohteet valitaan harkiten ja arpomalla. Automaattinen ja asiantuntijatarkastus.</li>
+      <li><strong>Kantelut</strong>Kantelujen käsittely johtaa hallinnolliseen ohjaukseen.</li>
+      <li><strong>Määräykset</strong>Tarvittaessa korjaamaan velvoitetaan uhkasakon voimalla.</li>
+    </ol>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Traficom</p>
+    <h2>Velvoitteet ja suositukset</h2>
+    <div class="cols">
+      <div>
+        <h3>Velvoitteet</h3>
+        <ul>
+          <li>Tekniset vaatimukset</li>
+          <li>Palautekanava ja prosessit palautteen käsittelyyn</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Suositukset</h3>
+        <ul>
+          <li>Huomioi alusta asti – jo hankinnassa</li>
+          <li>Sekä kehitys- että sisältötyö</li>
+          <li>Prosessit palautteen vastaanottoon</li>
+          <li>Saavutettavuus jatkuvana työnä</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Traficom</p>
+    <h2>Valvonta lukuina</h2>
+    <div class="stats" style="--n:4; --stat-size:72px">
+      <div class="stat"><b>234</b><span>automaattista tarkastusta 2026</span></div>
+      <div class="stat"><b>22 + 12</b><span>verkkosivustoa + mobiilisovellusta asiantuntija&shy;tarkastuksessa 2026</span></div>
+      <div class="stat"><b>1 451</b><span>tarkastusta vuodesta 2020</span></div>
+      <div class="stat"><b>1 055</b><span>palvelua tarkastettu vuodesta 2020</span></div>
+    </div>
+    <p class="muted small" style="margin-top:40px">Lisäksi korjaustarkastuksia.</p>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Traficom</p>
+    <h2>Ketä valvotaan?</h2>
+    <p>Valtakunnalliset palvelut sekä alueittain väestötiheyden mukaan:</p>
+    <div class="cols">
+      <ul>
+        <li>Kunnat, virastot, hyvinvointialueet</li>
+        <li>Työttömyys- ja eläkekassat</li>
+        <li>Oppilaitokset ja kirkot</li>
+      </ul>
+      <ul>
+        <li>Yhdistykset, säätiöt ja osakeyhtiöt</li>
+        <li>Julkisoikeudelliset oikeushenkilöt</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide slide--quote">
+    <p class="kicker">Traficom</p>
+    <blockquote>
+      Pelkästään WCAG-kriteereitä vasten tehty auditointi ei useimmiten riitä. EN 301 549 tuo lisävaatimuksia – esim. 9.7 <em>User preferences for web pages</em>.
+      <cite>Esimerkki: Turun kaupungin saavutettavuusseloste viittaa jo EN 301 549 -standardiin.</cite>
+    </blockquote>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Traficom</p>
+    <h2>Havaintoja direktiivin toimeenpanosta</h2>
+    <ul>
+      <li>Painopisteenä valvonta ja ennakoiva ohjaus: <em>”Kuulutte lain piiriin – satunnaisotanta osuu kohdalle ennemmin tai myöhemmin.”</em></li>
+      <li>Verkkokauppoja koskevat kantelut ovat nousussa.</li>
+      <li>Vaatimuksia päivitetty: saavutettavuusvaatimukset.fi</li>
+      <li><strong>WCAG 2.2 voimaan 2027.</strong></li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Traficom</p>
+    <h2>Kysymykset yleisöltä</h2>
+    <dl class="qa">
+      <dt>Q: HiQ:lta kysymys. Onko tuleva Traficomin saavutettavuustyökalu täysin FOSS?</dt>
+      <dd>A: (ei täysin mutta pyritään siihen että perusosat olisivat.)</dd>
+      <dt>Q: Näkyykö AI?</dt>
+      <dd>A: ei suoranaisesti mutta erittäin merkittävästi noussut esille "saavutettavuuslisäosat" joita palveluiden tuotteisiin asennetaan, useimmat eivät ole saavutettavia edes oikein asennettuna. Usein nojaudutaan tuotteisiin mutta ei hankita osaamista niitten ymmärtämiseksi.</dd>
+    </dl>
+  </section>
+
+  <!-- ===== 2. Verkkokaupat ===== -->
+  <section class="slide slide--section">
+    <p class="kicker">02</p>
+    <h1>Verkkokauppojen saavutettavuus</h1>
+    <div class="session">
+      <p class="session-title">Vuosi velvoitetta takana – Mikä tilanne verkkokauppojen saavutettavuudessa</p>
+      <ul class="speakers" aria-label="Puhujat"><li><strong>Sami Jukkara</strong><span>Q-Factory Oy</span></li></ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Verkkokaupat</p>
+    <h2>Tutkimusasetelma</h2>
+    <div class="stats" style="--n:3">
+      <div class="stat"><b>30</b><span>suurta verkkokauppaa</span></div>
+      <div class="stat"><b>9</b><span>tarkastettua kriteeriä</span></div>
+      <div class="stat"><b>16 %</b><span>WCAG AA -kriteereistä – suurin osa jäi tarkastamatta</span></div>
+    </div>
+    <p class="muted" style="margin-top:40px">Pintapuolinen saavutettavuus- ja ruudunlukijatestaus (Orca, NVDA).</p>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Verkkokaupat</p>
+    <h2>Tulokset</h2>
+    <div class="stats" style="--n:3">
+      <div class="stat"><b>40 %</b><span>ostopolku estyi tai oli erittäin vaikea</span></div>
+      <div class="stat"><b>80 %</b><span>näppäimistökäytön ongelmia</span></div>
+      <div class="stat"><b>73 %</b><span>kohdistus puutteellinen tai rikki – yhdestä puuttui kokonaan</span></div>
+    </div>
+    <p style="margin-top:40px"><strong>Suurin ongelma:</strong> dialogit ja mainokset keskeyttävät ja estävät käytön.</p>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Verkkokaupat</p>
+    <h2>Saavutettavuusselosteet</h2>
+    <div class="cols">
+      <div>
+        <h3>Tarkastettiin</h3>
+        <p>Löytyykö seloste, sisältääkö se oikeat asiat ja pitävätkö tiedot paikkansa?</p>
+      </div>
+      <ul>
+        <li><strong>70 %</strong>:lta seloste löytyi</li>
+        <li><strong>14</strong> sisälsi kaikki lain vaatimat tiedot</li>
+        <li><strong>11</strong> päivätty yli vuosi sitten</li>
+        <li>Yksi päiväämätön, yksi päivätty tulevaisuuteen</li>
+        <li>Tuore päiväys, vanha sisältö</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide slide--quote">
+    <p class="kicker">Verkkokaupat</p>
+    <blockquote>
+      Verkkokaupassa minimivaatimukset eivät riitä. Ostopolun ja navigaation pitää toimia, eivätkä ylimääräiset elementit saa olla esteenä.
+      <cite>Automaatiolla päästään alkuun – ihmistestaajaa tarvitaan valvomaan ja laajentamaan.</cite>
+    </blockquote>
+  </section>
+
+  <!-- ===== 3. hel.fi ===== -->
+  <section class="slide slide--section">
+    <p class="kicker">03</p>
+    <h1>hel.fi: saavutettavuus osana kehitysprosessia</h1>
+    <div class="session">
+      <p class="session-title">Käyttäjäkokemuksen laadunvarmistus – case Helsingin PalveluYdin</p>
+      <ul class="speakers" aria-label="Puhujat"><li><strong>Timo Övermark</strong><span>Q-Factory Oy</span></li><li><strong>Kati Seppälä</strong><span>Helsingin kaupunki</span></li><li><strong>Henna Niemi</strong><span>Helsingin kaupunki</span></li></ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">hel.fi</p>
+    <h2>Tuttu prosessi</h2>
+    <ol class="steps" style="--n:4">
+      <li><strong>Suunnittelu</strong>Käytettävyys ja UX</li>
+      <li><strong>HTML-proto</strong>Osin tekoälyavusteisesti? Käyttäjätestaus.</li>
+      <li><strong>Iterointi</strong>Tekninen iterointi protoa jatkaen</li>
+      <li><strong>Ennakko&shy;auditointi</strong>Erittäin suuri tyytyväisyys</li>
+    </ol>
+    <p style="margin-top:40px">Helsingin design-järjestelmä <strong>HDS</strong> on iso tekijä – pitkäjänteistä työtä.</p>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">hel.fi</p>
+    <h2>Esimerkit ja testaajat</h2>
+    <div class="cols">
+      <div>
+        <h3>Esimerkkiongelma</h3>
+        <p>Vain luku -kenttä vs. käytöstä poistettu kenttä – visuaalinen suunnittelu ja käyttötavat.</p>
+      </div>
+      <div>
+        <h3>Käyttäjätestaajat</h3>
+        <ul>
+          <li>Vakituiset pääkäyttäjät</li>
+          <li>Sisäiset työntekijät</li>
+          <li>Saavutettavuustestaus: ulkopuoliset</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 4. eBay ===== -->
+  <section class="slide slide--section">
+    <p class="kicker">04</p>
+    <h1>eBay: saavutettavuustiimin kokemuksia</h1>
+    <div class="session">
+      <p class="session-title">Scaling accessibility at a global e-commerce company – how eBay injects accessibility into their culture and processes</p>
+      <ul class="speakers" aria-label="Puhujat"><li><strong>Mark Lapole</strong><span>Director, Accessibility, eBay</span></li></ul>
+    </div>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">eBay</p>
+    <h2>Komponentit edellä, ihminen testaa</h2>
+    <ul>
+      <li><strong>eBay UI Core</strong> tuottanut hyviä tuloksia: saavutettavat komponentit, joita kehittäjät käyttävät – tai ainakin kopioivat mallit.</li>
+      <li><strong>4 hengen</strong> saavutettavuustiimi.</li>
+      <li><strong>Ei enää erillistä QA:ta</strong> – tekee työstä vaikeampaa.</li>
+      <li><strong>Ei luoteta automaatioon</strong> – aina manuaalista testausta päälle.</li>
+    </ul>
+  </section>
+
+  <section class="slide slide--quote">
+    <p class="kicker">eBay</p>
+    <blockquote>
+      ”Julkaise nopeasti, korjaa nopeasti” ei jostain syystä ulotu saavutettavuuteen.
+      <cite>Haaste: pitää saavutettavuus kehityssyklissä ja estää regressiot.</cite>
+    </blockquote>
+  </section>
+
+  <!-- ===== 5. Paneeli ===== -->
+  <section class="slide slide--section">
+    <p class="kicker">05</p>
+    <h1>Paneeli</h1>
+    <div class="session">
+      <p class="session-title">Kenen vastuulla saavutettavuus on?</p>
+      <ul class="speakers" aria-label="Puhujat"><li><strong>Päivi Salo</strong><span>Oral Hammaslääkärit Oy</span></li><li><strong>Heli Jeskanen</strong><span>OP Pohjola</span></li><li><strong>Minna Pöntys</strong><span>Yle</span></li><li><strong>Jesse Ukkonen</strong><span>Kesko / K-Ruoka</span></li><li><strong>Marko Peltonen</strong><span>Q-Factory Oy</span></li></ul>
+    </div>
+  </section>
+
+  <section class="slide figure">
+    <p class="kicker">Paneeli</p>
+    <h2>Panelistit</h2>
+    <img src="assets/panelistit.png" alt="Panelistit: Päivi Salo, Oral Hammaslääkärit Oy; Heli Jeskanen, OP Pohjola; Minna Pöntys, YLE; Jesse Ukkonen, Kesko/K-Ruoka; Marko Peltonen, Q-Factory Oy.">
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Paneeli · OP</p>
+    <h2>Raha motivoi</h2>
+    <ul>
+      <li>Lakisääteisyys on ollut parasta, mitä saavutettavuudelle on tapahtunut.</li>
+      <li>Silti työ tehdään alusta asti – sisällöllisenä, ei vain teknisenä asiana.</li>
+      <li>Johtoryhmän valistamisella suuri merkitys.</li>
+      <li>Puhutaan asiakaskokemuksesta ja asiakkaiden menettämisestä.</li>
+      <li>Mittaaminen on vaikeaa.</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Paneeli · Kesko</p>
+    <h2>Asiakas ei sano ”saavutettavuus”</h2>
+    <ul>
+      <li>Kysymykset koskevat tiedon löytymistä: <em>”Mistä löytyy X?”</em> – tiedon saavutettavuutta.</li>
+      <li>Tekeminen: pieniä tehtäviä, pieni yksikkökustannus.</li>
+      <li>Liiketoiminta: kysymykset koskevat palvelua.</li>
+    </ul>
+  </section>
+
+  <section class="slide slide--quote">
+    <p class="kicker">Paneeli · Kesko</p>
+    <blockquote>
+      Saavutettavuus tekee näkyväksi huonon suunnittelun ja toteutuksen – ja sitä kautta huonon asiakaskokemuksen.
+    </blockquote>
+  </section>
+
+  <section class="slide">
+    <p class="kicker">Paneeli · YLE</p>
+    <h2>Kieli on saavutettavuutta</h2>
+    <p>Palvelukielet sekä kieliasu ja sen laatu ovat merkittäviä.</p>
+  </section>
+
+  <section class="slide slide--title" aria-label="Loppu">
+    <p class="kicker">Saavuta 2026</p>
+    <h1>Kiitos!</h1>
+    <p>Sakari Laaksonen</p>
+  </section>
+
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <div class="counter" id="counter" aria-hidden="true"></div>
+  <div class="sr-only" id="live" aria-live="polite"></div>
+</main>
+
+<script>
+(() => {
+  const deck = document.getElementById('deck');
+  const slides = [...deck.querySelectorAll('.slide')];
+  const progress = document.getElementById('progress');
+  const counter = document.getElementById('counter');
+  const live = document.getElementById('live');
+  let i = 0;
+
+  function fit() {
+    const s = Math.min(innerWidth / deck.offsetWidth, innerHeight / deck.offsetHeight);
+    deck.style.transform = `translate(-50%, -50%) scale(${s})`;
+  }
+
+  function go(n, announce = true) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((el, k) => {
+      el.classList.toggle('is-active', k === i);
+      el.setAttribute('aria-hidden', k !== i);
+    });
+    progress.style.width = `${((i + 1) / slides.length) * 100}%`;
+    counter.textContent = `${i + 1} / ${slides.length}`;
+    history.replaceState(null, '', `#${i + 1}`);
+    if (announce) {
+      const h = slides[i].querySelector('h1, h2, blockquote');
+      live.textContent = `Dia ${i + 1}/${slides.length}: ${h ? h.textContent.trim() : ''}`;
+    }
+  }
+
+  addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    switch (e.key) {
+      case 'ArrowRight': case 'ArrowDown': case 'PageDown': case ' ': case 'Enter':
+        e.preventDefault(); go(i + 1); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': case 'Backspace':
+        e.preventDefault(); go(i - 1); break;
+      case 'Home': go(0); break;
+      case 'End': go(slides.length - 1); break;
+      case 'f': case 'F':
+        document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+        break;
+    }
+  });
+
+  // Click right two-thirds = next, left third = previous
+  addEventListener('click', e => go(e.clientX < innerWidth / 3 ? i - 1 : i + 1));
+
+  // Touch swipe
+  let x0 = null;
+  addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 40) go(dx < 0 ? i + 1 : i - 1);
+    x0 = null;
+  });
+
+  addEventListener('resize', fit);
+  addEventListener('hashchange', () => go(parseInt(location.hash.slice(1), 10) - 1 || 0));
+  fit();
+  go((parseInt(location.hash.slice(1), 10) || 1) - 1, false);
+})();
+</script>
+</body>
+</html>
